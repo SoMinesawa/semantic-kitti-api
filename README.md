@@ -1,3 +1,5 @@
+python compare.py -s ../TCUSS/data/dataset/semantickitti/dataset/sequences/08/velodyne/ -l ../TCUSS/data/users/minesawa/semantickitti/fixed_tarl_lr/pred_result/sequences/08/predictions/ ../TCUSS/data/users/minesawa/semantickitti/growsp_model/pred_result/sequences/08/predictions/ ../TCUSS/data/dataset/semantickitti/dataset/sequences/08/labels/ -k -r --split_direction vertical
+
 # API for SemanticKITTI
 
 This repository contains helper scripts to open, visualize, process, and 

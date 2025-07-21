@@ -5,21 +5,122 @@ import argparse
 import os
 import yaml
 from auxiliary.laserscan import LaserScan, SemLaserScan
-from auxiliary.laserscancomp import LaserScanComp
+from auxiliary.laserscanvis import LaserScanVis
+from auxiliary.vispy_manager import VispyManager
+import vispy
+from vispy.scene import visuals, SceneCanvas
+import numpy as np
+
+class LaserScanMultiComp(VispyManager):
+  """Class that creates and handles a multi-view pointcloud comparison"""
+
+  def __init__(self, scans, scan_names, label_names, offset=0, images=True, instances=False, link=False, split_direction='horizontal'):
+    super().__init__(offset, len(scan_names), images, instances)
+    self.scans = scans
+    self.scan_names = scan_names
+    self.label_names = label_names
+    self.link = link
+    self.split_direction = split_direction  # 'horizontal' or 'vertical'
+    self.views = []
+    self.visuals = []
+    self.img_views = []
+    self.img_visuals = []
+    self.inst_views = []
+    self.inst_visuals = []
+    self.img_inst_views = []
+    self.img_inst_visuals = []
+    self.reset()
+    self.update_scan()
+
+  def reset(self):
+    """prepares the canvas(es) for the visualizer"""
+    n_scans = len(self.scans)
+    
+    # Create views for each scan based on split direction
+    for i in range(n_scans):
+      if self.split_direction == 'horizontal':
+        # Horizontal split (side by side)
+        row, col = 0, i
+      else:
+        # Vertical split (top to bottom)
+        row, col = i, 0
+        
+      view, vis = super().add_viewbox(row, col)
+      self.views.append(view)
+      self.visuals.append(vis)
+      
+      # Link cameras if requested
+      if self.link and i > 0:
+        self.views[0].camera.link(view.camera)
+    
+    # Add image views if requested
+    if self.images:
+      for i in range(n_scans):
+        img_view, img_vis = super().add_image_viewbox(i, 0)
+        self.img_views.append(img_view)
+        self.img_visuals.append(img_vis)
+        
+        if self.instances:
+          img_inst_view, img_inst_vis = super().add_image_viewbox(i + n_scans, 0)
+          self.img_inst_views.append(img_inst_view)
+          self.img_inst_visuals.append(img_inst_vis)
+    
+    # Add instance views if requested
+    if self.instances:
+      for i in range(n_scans):
+        if self.split_direction == 'horizontal':
+          row, col = 1, i
+        else:
+          row, col = i + n_scans, 0
+          
+        inst_view, inst_vis = super().add_viewbox(row, col)
+        self.inst_views.append(inst_view)
+        self.inst_visuals.append(inst_vis)
+        
+        # Link cameras if requested
+        if self.link:
+          self.views[i].camera.link(inst_view.camera)
+
+  def update_scan(self):
+    """updates the scans, images and instances"""
+    for i, scan in enumerate(self.scans):
+      scan.open_scan(self.scan_names[self.offset])
+      scan.open_label(self.label_names[i][self.offset])
+      scan.colorize()
+      self.visuals[i].set_data(scan.points,
+                            face_color=scan.sem_label_color[..., ::-1],
+                            edge_color=scan.sem_label_color[..., ::-1],
+                            size=1)
+
+    if self.instances:
+      for i, scan in enumerate(self.scans):
+        self.inst_visuals[i].set_data(scan.points,
+                                 face_color=scan.inst_label_color[..., ::-1],
+                                 edge_color=scan.inst_label_color[..., ::-1],
+                                 size=1)
+
+    if self.images:
+      for i, scan in enumerate(self.scans):
+        self.img_visuals[i].set_data(scan.proj_sem_color[..., ::-1])
+        self.img_visuals[i].update()
+
+        if self.instances:
+          self.img_inst_visuals[i].set_data(scan.proj_inst_color[..., ::-1])
+          self.img_inst_visuals[i].update()
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser("./compare.py")
   parser.add_argument(
-      '--dataset', '-d',
+      '--scan_path', '-s',
       type=str,
       required=True,
-      help='Dataset to visualize. No Default',
+      help='Path to point cloud scans. No Default',
   )
   parser.add_argument(
-      '--labels',
+      '--label_paths', '-l',
       required=True,
       nargs='+',
-      help='Labels A to visualize. No Default',
+      help='Paths to label folders to visualize. No Default',
   )
   parser.add_argument(
       '--config', '-c',
@@ -29,19 +130,12 @@ if __name__ == '__main__':
       help='Dataset config file. Defaults to %(default)s',
   )
   parser.add_argument(
-      '--sequence', '-s',
-      type=str,
-      default="00",
-      required=False,
-      help='Sequence to visualize. Defaults to %(default)s',
-  )
-  parser.add_argument(
       '--ignore_images', '-r',
       dest='ignore_images',
       default=False,
       required=False,
       action='store_true',
-      help='Visualize range image projections too. Defaults to %(default)s',
+      help='Do not visualize range image projections. Defaults to %(default)s',
   )
   parser.add_argument(
       '--do_instances', '-i',
@@ -52,7 +146,7 @@ if __name__ == '__main__':
       help='Visualize instances too. Defaults to %(default)s',
   )
   parser.add_argument(
-      '--link', '-l',
+      '--link', '-k',
       dest='link',
       default=False,
       required=False,
@@ -85,20 +179,54 @@ if __name__ == '__main__':
     action='store_true',
     help='Apply learning map to color map: visualize only classes that were trained on',
   )
+  parser.add_argument(
+    '--split_direction',
+    type=str,
+    default='horizontal',
+    choices=['horizontal', 'vertical'],
+    required=False,
+    help='Direction to split visualization windows. Defaults to %(default)s',
+  )
+  parser.add_argument(
+    '--random_colors',
+    type=str,
+    nargs='+',
+    default=[],
+    required=False,
+    help='List of label path indices (0-based) to use random colors instead of semantic colors',
+  )
+  parser.add_argument(
+    '--random_seed',
+    type=int,
+    default=42,
+    required=False,
+    help='Random seed for generating random colors. Defaults to %(default)s',
+  )
+  parser.add_argument(
+    '--max_label',
+    type=int,
+    default=20000,
+    required=False,
+    help='Maximum label value for random colors. Defaults to %(default)s',
+  )
   FLAGS, unparsed = parser.parse_known_args()
 
   # print summary of what we will do
   print("*" * 80)
   print("INTERFACE:")
-  print("Labels: ", FLAGS.labels)
+  print("Scan path: ", FLAGS.scan_path)
+  print("Label paths: ", FLAGS.label_paths)
   print("Config", FLAGS.config)
-  print("Sequence", FLAGS.sequence)
   print("ignore_images", FLAGS.ignore_images)
   print("do_instances", FLAGS.do_instances)
   print("link", FLAGS.link)
   print("ignore_safety", FLAGS.ignore_safety)
   print("color_learning_map", FLAGS.color_learning_map)
   print("offset", FLAGS.offset)
+  print("split_direction", FLAGS.split_direction)
+  print("random_colors", FLAGS.random_colors)
+  print("random_seed", FLAGS.random_seed)
+  print("max_label", FLAGS.max_label)
   print("*" * 80)
 
   # open config file
@@ -110,52 +238,37 @@ if __name__ == '__main__':
     print("Error opening yaml file.")
     quit()
 
-  # fix sequence name
-  FLAGS.sequence = '{0:02d}'.format(int(FLAGS.sequence))
-
-  # does sequence folder exist?
-  scan_paths = os.path.join(FLAGS.dataset, "sequences", FLAGS.sequence, "velodyne")
-
-  if os.path.isdir(scan_paths):
-    print("Sequence folder a exists! Using sequence from %s" % scan_paths)
+  # does scan path exist?
+  scan_path = FLAGS.scan_path
+  if os.path.isdir(scan_path):
+    print("Scan folder exists! Using scans from %s" % scan_path)
   else:
-    print(f"Sequence folder {scan_paths} doesn't exist! Exiting...")
+    print(f"Scan folder {scan_path} doesn't exist! Exiting...")
     quit()
 
   # populate the pointclouds
-  scan_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(scan_paths)) for f in fn]
+  scan_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(scan_path)) for f in fn]
   scan_names.sort()
 
-  print(len(scan_names))
+  print(f"Found {len(scan_names)} scans")
 
-  # does sequence folder exist?
-  assert len(FLAGS.labels) == 2
-  labels_a, labels_b = FLAGS.labels[0], FLAGS.labels[1]
-  label_a_paths = os.path.join(FLAGS.dataset, "sequences", FLAGS.sequence, labels_a)
-  label_b_paths = os.path.join(FLAGS.dataset, "sequences", FLAGS.sequence, labels_b)
-
-  if os.path.isdir(label_a_paths):
-    print("Labels folder a exists! Using labels from %s" % label_a_paths)
-  else:
-    print("Labels folder a doesn't exist! Exiting...")
-    quit()
-
-  if os.path.isdir(label_b_paths):
-    print("Labels folder b exists! Using labels from %s" % label_b_paths)
-  else:
-    print("Labels folder b doesn't exist! Exiting...")
-    quit()
-
-  # populate the pointclouds
-  label_a_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(label_a_paths)) for f in fn]
-  label_a_names.sort()
-  label_b_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(label_b_paths)) for f in fn]
-  label_b_names.sort()
-
-  # check that there are same amount of labels and scans
-  if not FLAGS.ignore_safety:
-    assert len(label_a_names) == len(scan_names)
-    assert len(label_b_names) == len(scan_names)
+  # check if label paths exist
+  label_names = []
+  for i, label_path in enumerate(FLAGS.label_paths):
+    if os.path.isdir(label_path):
+      print(f"Labels folder {i+1} exists! Using labels from {label_path}")
+    else:
+      print(f"Labels folder {label_path} doesn't exist! Exiting...")
+      quit()
+      
+    # populate the labels
+    labels = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(label_path)) for f in fn]
+    labels.sort()
+    label_names.append(labels)
+    
+    # check that there are same amount of labels and scans
+    if not FLAGS.ignore_safety:
+      assert len(labels) == len(scan_names), f"Number of labels in {label_path} ({len(labels)}) doesn't match number of scans ({len(scan_names)})"
 
   # create scans
   color_dict = CFG["color_map"]
@@ -164,15 +277,34 @@ if __name__ == '__main__':
     learning_map = CFG["learning_map"]
     color_dict = {key: color_dict[learning_map_inv[learning_map[key]]] for key, value in color_dict.items()}
 
-  scan_b = SemLaserScan(color_dict, project=True)
-  scan_a = SemLaserScan(color_dict, project=True)
+  scans = []
+  for i in range(len(FLAGS.label_paths)):
+    # 指定されたインデックスのラベルパスにはランダムな色を使用
+    if str(i) in FLAGS.random_colors:
+      print(f"Using random colors for label path {i+1} with seed {FLAGS.random_seed} and max_label {FLAGS.max_label}")
+      # 再現性のためにシードを設定
+      random_state = np.random.RandomState(FLAGS.random_seed)
+      
+      # ユニークなラベル値を取得するための仮のカラーマップを作成
+      random_color_dict = {}
+      for j in range(int(FLAGS.max_label)):
+        random_color_dict[j] = random_state.randint(0, 256, 3).tolist()
+      
+      scans.append(SemLaserScan(random_color_dict, project=True, random_seed=FLAGS.random_seed))
+    else:
+      # 通常のセマンティックカラーを使用
+      scans.append(SemLaserScan(color_dict, project=True, random_seed=FLAGS.random_seed))
 
   # create a visualizer
   images = not FLAGS.ignore_images
-  vis = LaserScanComp(scans=(scan_a, scan_b),
+  vis = LaserScanMultiComp(scans=scans,
                      scan_names=scan_names,
-                     label_names=(label_a_names, label_b_names),
-                     offset=FLAGS.offset, images=images, instances=FLAGS.do_instances, link=FLAGS.link)
+                     label_names=label_names,
+                     offset=FLAGS.offset, 
+                     images=images, 
+                     instances=FLAGS.do_instances, 
+                     link=FLAGS.link,
+                     split_direction=FLAGS.split_direction)
 
   # print instructions
   print("To navigate:")

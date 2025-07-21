@@ -168,9 +168,9 @@ class LaserScan:
 
 class SemLaserScan(LaserScan):
   """Class that contains LaserScan with x,y,z,r,sem_label,sem_color_label,inst_label,inst_color_label"""
-  EXTENSIONS_LABEL = ['.label']
+  EXTENSIONS_LABEL = ['.label', '.ply', '.npy']
 
-  def __init__(self, sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0):
+  def __init__(self, sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, random_seed=42):
     super(SemLaserScan, self).__init__(project, H, W, fov_up, fov_down)
     self.reset()
 
@@ -183,11 +183,13 @@ class SemLaserScan(LaserScan):
     for key, value in sem_color_dict.items():
       self.sem_color_lut[key] = np.array(value, np.float32) / 255.0
 
-    # make instance colors
+    # make instance colors - use fixed seed for reproducibility
     max_inst_id = 100000
-    self.inst_color_lut = np.random.uniform(low=0.0,
-                                            high=1.0,
-                                            size=(max_inst_id, 3))
+    # 固定シードで乱数を生成
+    rng = np.random.RandomState(random_seed)
+    self.inst_color_lut = rng.uniform(low=0.0,
+                                       high=1.0,
+                                       size=(max_inst_id, 3))
     # force zero to a gray-ish color
     self.inst_color_lut[0] = np.full((3), 0.1)
 
@@ -228,8 +230,13 @@ class SemLaserScan(LaserScan):
       raise RuntimeError("Filename extension is not valid label file.")
 
     # if all goes well, open label
-    label = np.fromfile(filename, dtype=np.uint32)
-    label = label.reshape((-1))
+    if filename.endswith('.bin') or filename.endswith('.label'):
+      label = np.fromfile(filename, dtype=np.uint32)
+      label = label.reshape((-1))
+    elif filename.endswith('.npy') or filename.endswith('.ply'):
+      label = np.load(filename)
+    else:
+      raise ValueError(f"Invalid label file extension: {filename}")
 
     # set it
     self.set_label(label)
