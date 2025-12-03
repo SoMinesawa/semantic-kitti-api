@@ -3,6 +3,7 @@
 
 import argparse
 import os
+import sys
 import yaml
 from auxiliary.laserscan import LaserScan, SemLaserScan
 from auxiliary.laserscanvis import LaserScanVis
@@ -14,8 +15,8 @@ import numpy as np
 class LaserScanMultiComp(VispyManager):
   """Class that creates and handles a multi-view pointcloud comparison"""
 
-  def __init__(self, scans, scan_names, label_names, offset=0, images=True, instances=False, link=False, split_direction='horizontal'):
-    super().__init__(offset, len(scan_names), images, instances)
+  def __init__(self, scans, scan_names, label_names, offset=0, images=True, instances=False, link=False, split_direction='horizontal', white_background=False):
+    super().__init__(offset, len(scan_names), images, instances, white_background)
     self.scans = scans
     self.scan_names = scan_names
     self.label_names = label_names
@@ -107,18 +108,31 @@ class LaserScanMultiComp(VispyManager):
         if self.instances:
           self.img_inst_visuals[i].set_data(scan.proj_inst_color[..., ::-1])
           self.img_inst_visuals[i].update()
+    
+    # Update window title with current scan number
+    title = "scan " + str(self.offset)
+    self.canvas.title = title
+    if self.images:
+      self.img_canvas.title = title
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser("./compare.py")
   parser.add_argument(
+      '--config_run',
+      type=str,
+      required=False,
+      default=None,
+      help='YAML file with run configuration. If specified, values from this file are used as defaults.',
+  )
+  parser.add_argument(
       '--scan_path', '-s',
       type=str,
-      required=True,
+      required=False,
       help='Path to point cloud scans. No Default',
   )
   parser.add_argument(
       '--label_paths', '-l',
-      required=True,
+      required=False,
       nargs='+',
       help='Paths to label folders to visualize. No Default',
   )
@@ -209,7 +223,39 @@ if __name__ == '__main__':
     required=False,
     help='Maximum label value for random colors. Defaults to %(default)s',
   )
+  parser.add_argument(
+    '--white_background',
+    dest='white_background',
+    default=False,
+    required=False,
+    action='store_true',
+    help='Use white background instead of black. Defaults to %(default)s',
+  )
+  # First, parse only to get config_run
+  FLAGS_temp, _ = parser.parse_known_args()
+  
+  # Load run config if specified and set as defaults
+  if FLAGS_temp.config_run:
+    try:
+      print("Loading run config file %s" % FLAGS_temp.config_run)
+      run_config = yaml.safe_load(open(FLAGS_temp.config_run, 'r'))
+      # Set defaults from YAML config
+      parser.set_defaults(**run_config)
+    except Exception as e:
+      print(e)
+      print("Error opening run config yaml file.")
+      quit()
+  
+  # Parse again with updated defaults (command line args will override defaults)
   FLAGS, unparsed = parser.parse_known_args()
+
+  # Validate required arguments
+  if not FLAGS.scan_path:
+    print("Error: scan_path must be specified either via command line or config file")
+    quit()
+  if not FLAGS.label_paths:
+    print("Error: label_paths must be specified either via command line or config file")
+    quit()
 
   # print summary of what we will do
   print("*" * 80)
@@ -227,6 +273,7 @@ if __name__ == '__main__':
   print("random_colors", FLAGS.random_colors)
   print("random_seed", FLAGS.random_seed)
   print("max_label", FLAGS.max_label)
+  print("white_background", FLAGS.white_background)
   print("*" * 80)
 
   # open config file
@@ -304,7 +351,8 @@ if __name__ == '__main__':
                      images=images, 
                      instances=FLAGS.do_instances, 
                      link=FLAGS.link,
-                     split_direction=FLAGS.split_direction)
+                     split_direction=FLAGS.split_direction,
+                     white_background=FLAGS.white_background)
 
   # print instructions
   print("To navigate:")

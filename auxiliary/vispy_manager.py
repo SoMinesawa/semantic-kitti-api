@@ -7,7 +7,9 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 class VispyManager(ABC):
-  def __init__(self, offset, total, images, instances):
+  def __init__(self, offset, total, images, instances, white_background=False):
+    self.white_background = white_background
+    self.bgcolor = 'white' if white_background else 'black'
     self.canvas, self.grid = self.add_canvas('interactive', 'scan')
     self.offset = offset
     self.images = images
@@ -24,9 +26,9 @@ class VispyManager(ABC):
   def add_canvas(self, keys, title, size=None):
     canvas = None
     if size:
-      canvas = SceneCanvas(keys=keys, show=True, size=size, title=title)
+      canvas = SceneCanvas(keys=keys, show=True, size=size, title=title, bgcolor=self.bgcolor)
     else:
-      canvas = SceneCanvas(keys=keys, show=True, title=title)
+      canvas = SceneCanvas(keys=keys, show=True, title=title, bgcolor=self.bgcolor)
 
     canvas.events.key_press.connect(self.key_press)
     canvas.events.draw.connect(self.draw)

@@ -1,0 +1,18 @@
+name: semantickitti
+channels:
+  - conda-forge
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy>=1.24.0
+  - matplotlib>=2.2.3
+  - pyyaml>=5.1.1
+  - pytorch>=1.1.0
+  - pyqt=5
+  - pyopengl>=3.1.0
+  - pip:
+    - vispy>=0.5.3
+    - imgui[glfw]>=1.0.0
+    - glfw>=1.8.3 

@@ -1,0 +1,42 @@
+# Path to point cloud scans
+scan_path: ../TCUSS/data/dataset/semantickitti/dataset/sequences/08/velodyne/
+
+# Paths to label folders to visualize
+label_paths:
+  - ../TCUSS/data/users/minesawa/semantickitti/fixed_tarl_lr/pred_result/sequences/08/predictions/
+  - ../TCUSS/data/users/minesawa/semantickitti/growsp_model/pred_result/sequences/08/predictions/
+  - ../TCUSS/data/dataset/semantickitti/dataset/sequences/08/labels/
+
+# Link viewpoint changes across windows
+link: true
+
+# Do not visualize range image projections
+ignore_images: true
+
+# Visualize instances too
+do_instances: false
+
+# Sequence to start
+offset: 0
+
+# Direction to split visualization windows ('horizontal' or 'vertical')
+split_direction: vertical
+
+# List of label path indices (0-based) to use random colors instead of semantic colors
+random_colors: []
+
+# Random seed for generating random colors
+random_seed: 42
+
+# Maximum label value for random colors
+max_label: 20000
+
+# Use white background instead of black
+white_background: true
+
+# Normally you want the number of labels and ptcls to be the same
+ignore_safety: false
+
+# Apply learning map to color map: visualize only classes that were trained on
+color_learning_map: false
+
