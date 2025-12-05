@@ -3,8 +3,8 @@ scan_path: ../TCUSS/data/dataset/semantickitti/dataset/sequences/08/velodyne/
 
 # Paths to label folders to visualize
 label_paths:
-  - ../TCUSS/data/users/minesawa/semantickitti/hdb_early_3/pred_result/sequences/08/predictions/
   - ../TCUSS/data/users/minesawa/semantickitti/growsp_model/pred_result/sequences/08/predictions/
+  - ../TCUSS/data/users/minesawa/semantickitti/hdb_early_3/pred_result/sequences/08/predictions/
   - ../TCUSS/data/dataset/semantickitti/dataset/sequences/08/labels/
 
 # Link viewpoint changes across windows
