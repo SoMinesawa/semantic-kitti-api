@@ -38,5 +38,4 @@ white_background: true
 ignore_safety: false
 
 # Apply learning map to color map: visualize only classes that were trained on
-color_learning_map: false
-
+color_learning_map: true
