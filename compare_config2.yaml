@@ -1,11 +1,9 @@
 # Path to point cloud scans
-scan_path: ../TCUSS/data/dataset/semantickitti/dataset/sequences/08/velodyne/
+scan_path: data/dataset/semantickitti/dataset/sequences/09/velodyne/
 
 # Paths to label folders to visualize
 label_paths:
-  - ../TCUSS/data/users/minesawa/semantickitti/growsp_model/pred_result/sequences/08/predictions/
-  - ../TCUSS/data/users/minesawa/semantickitti/stc_window1/pred_result/sequences/08/predictions/
-  - ../TCUSS/data/dataset/semantickitti/dataset/sequences/08/labels/
+  - data/dataset/semantickitti/dataset/sequences/09/labels/
 
 # Link viewpoint changes across windows
 link: true
@@ -17,7 +15,7 @@ ignore_images: true
 do_instances: false
 
 # Sequence to start
-offset: 3000
+offset: 0
 
 # Direction to split visualization windows ('horizontal' or 'vertical')
 split_direction: vertical

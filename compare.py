@@ -402,6 +402,7 @@ if __name__ == '__main__':
 
   # check if label paths exist
   label_names = []
+  label_maps = []
   for i, label_path in enumerate(FLAGS.label_paths):
     if os.path.isdir(label_path):
       print(f"Labels folder {i+1} exists! Using labels from {label_path}")
@@ -413,10 +414,48 @@ if __name__ == '__main__':
     labels = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(label_path)) for f in fn]
     labels.sort()
     label_names.append(labels)
-    
-    # check that there are same amount of labels and scans
-    if not FLAGS.ignore_safety:
-      assert len(labels) == len(scan_names), f"Number of labels in {label_path} ({len(labels)}) doesn't match number of scans ({len(scan_names)})"
+
+    # map basename (without extension) to full path for alignment
+    label_map = {os.path.splitext(os.path.basename(f))[0]: f for f in labels}
+    label_maps.append(label_map)
+
+  # Align scans and labels by common basename (e.g., 000000)
+  scan_map = {os.path.splitext(os.path.basename(f))[0]: f for f in scan_names}
+  common_keys = set(scan_map.keys())
+  for lm in label_maps:
+    common_keys &= set(lm.keys())
+
+  if not common_keys:
+    print("No common scan ids found across scan path and all label paths. Exiting...")
+    quit()
+
+  def sort_key(key):
+    return int(key) if key.isdigit() else key
+
+  sorted_keys = sorted(common_keys, key=sort_key)
+
+  # Report skipped items when counts don't match
+  skipped_scans = len(scan_map) - len(common_keys)
+  if skipped_scans > 0:
+    print(f"Skipping {skipped_scans} scans without labels in all sets.")
+  for idx, lm in enumerate(label_maps):
+    skipped_labels = len(lm) - len(common_keys)
+    if skipped_labels > 0:
+      print(f"Label path {idx+1}: skipping {skipped_labels} labels without matching scans.")
+
+  print(f"Using {len(sorted_keys)} aligned scans/labels for visualization.")
+
+  # rebuild ordered lists with only aligned entries
+  scan_names = [scan_map[k] for k in sorted_keys]
+  aligned_label_names = []
+  for lm in label_maps:
+    aligned_label_names.append([lm[k] for k in sorted_keys])
+  label_names = aligned_label_names
+
+  # safety: reset offset if it points past the filtered list
+  if FLAGS.offset >= len(scan_names):
+    print(f"Requested offset {FLAGS.offset} exceeds available aligned scans ({len(scan_names)}). Resetting to 0.")
+    FLAGS.offset = 0
 
   # create scans
   base_color_map = CFG["color_map"]

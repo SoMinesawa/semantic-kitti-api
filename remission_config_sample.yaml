@@ -1,0 +1,30 @@
+# visualize_remission.py の設定ファイルサンプル
+
+# Path to point cloud scans (velodyne folder)
+scan_path: data/dataset/semantickitti/dataset/sequences/00/velodyne/
+
+# Path to label folder (labels folder)
+label_path: data/dataset/semantickitti/dataset/sequences/00/labels/
+
+# Dataset config file
+config: config/semantic-kitti.yaml
+
+# Do not visualize range image projections
+ignore_images: false
+
+# Sequence to start
+offset: 0
+
+# Use white background instead of black
+white_background: false
+
+# Colormap for remission visualization
+# Options: viridis, plasma, inferno, magma, cividis, etc.
+cmap: viridis
+
+# Apply learning map to color map for GT
+color_learning_map: true
+
+
+
+
